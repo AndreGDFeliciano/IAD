@@ -7,7 +7,7 @@ languages: C and python3
 Sends command to arduino and reads AnalogIn
 """
 
-__author__ = "ist1100286 André Feliciano & ist110???? Rodrigo Casimiro"
+__author__ = "ist1100286 André Feliciano & ist1103132 Rodrigo Casimiro"
 __version__ = "42"
 
 
@@ -23,7 +23,8 @@ import numpy as np
 import time
 import sys
 
-arduino=serial.Serial(port='/dev/tty.usbmodem1101',baudrate=9600,timeout=.1)
+#arduino=serial.Serial(port='/dev/tty.usbmodem1101',baudrate=9600,timeout=.1)
+arduino=serial.Serial(port='/dev/cu.usbmodem1101',baudrate=9600,timeout=.1)
 #arduino = serial.Serial(port="/dev/ttyACM0", baudrate= 9600, timeout=.1)
 
 
