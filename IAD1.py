@@ -140,6 +140,10 @@ if __name__ == '__main__':
     sys.exit(app.exec_())
 
 
+# Janela Utilizador introduzir comando
+# Start/Stop
+# comando
+
 """ test with integers
 ###
 while True: #cycle to test if we can talk to the arduino
