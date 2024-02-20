@@ -26,7 +26,7 @@ import sys
 #arduino=serial.Serial(port='/dev/tty.usbmodem1101',baudrate=9600,timeout=.1)
 arduino=serial.Serial(port='/dev/cu.usbmodem1101',baudrate=9600,timeout=.1)
 #arduino = serial.Serial(port="/dev/ttyACM0", baudrate= 9600, timeout=.1)
-print("potato")
+print("potatoes2")
 
 
 class MyApp(QWidget):
