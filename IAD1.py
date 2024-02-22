@@ -24,9 +24,8 @@ import time
 import sys
 
 #arduino=serial.Serial(port='/dev/tty.usbmodem1101',baudrate=9600,timeout=.1)
-arduino=serial.Serial(port='/dev/cu.usbmodem1101',baudrate=9600,timeout=.1)
-#arduino = serial.Serial(port="/dev/ttyACM0", baudrate= 9600, timeout=.1)
-print("potatoes2")
+#arduino=serial.Serial(port='/dev/cu.usbmodem1101',baudrate=9600,timeout=.1)
+arduino = serial.Serial(port="/dev/ttyACM0", baudrate= 9600, timeout=.1)
 
 
 class MyApp(QWidget):
@@ -36,26 +35,28 @@ class MyApp(QWidget):
         self.initUI()
         self.x = []
         self.y = []
+        self.time_int = 1000
 
     def initUI(self):
         self.setGeometry(300, 300, 500, 400) # (x, y, width, height)
         self.setWindowTitle('My PyQt5 App')
 
-        self.button1 = QPushButton('test button', self)
+        self.button1 = QPushButton('Test button', self)
         self.button1.setToolTip('This is a <b>QPushButton</b> widget')
         self.button1.clicked.connect(self.showMessageBox)
         #button1.clicked.connect(self.comando("3"))
 
         self.button2 = QPushButton('Enviar 1 comando', self)
-        self.button2.setToolTip('Enviar comando para arduino')
+        self.button2.setToolTip(
+                    'Enviar comando para arduino, devolve tensão(V)')
         self.button2.clicked.connect(
             lambda:self.callFunctionWithArgument('Hello from PyQt!'))
 
-        self.button3 = QPushButton('Enviar comandos periódicos', self)
+        self.button3 = QPushButton('Start/Stop comandos periódicos', self)
         self.button3.setCheckable(True)
         self.button3.setChecked(False)
         self.button3.setToolTip(
-                              'Envia comando periodicamente e atualiza gráfico')
+                    'Envia comando periodicamente e atualiza gráfico')
         self.button3.toggled.connect(self.toggleGraphUpdate)
 
         # Create layout
@@ -114,19 +115,46 @@ class MyApp(QWidget):
             return data
         raise ValueError("comando: argumento inválido")
 
-    def toggleGraphUpdate(self):
-        if self.button3.isChecked():
-            self.timer.start(1000)  # Update every 1 second
-        else:
-            self.timer.stop()  # Stop the timer
+    def time_freq(freq = 0):
+        """Receives a frequency and transforms into time (ms)
+        Receives:
+            freq = 0 (int, optional): _description_. Defaults to 0.
+        Raises:
+            ValueError not a number
+        Returns:
+            time (int): time in ms
+        """
+        if isinstance(freq,float) and not freq:
+            return 1000//freq
+        raise ValueError("Freq: not a number")
+            
+    def toggleGraphUpdate(self,time = 1000):
+        """
+        Sets the timer for updating graph at a set interval
+        Receives:
+            time = 1000 (int, optional): time interval
+        """
+        if isinstance(time,int)or isinstance(time,float):
+            if self.button3.isChecked():
+                self.timer.start(int(time))  # Update every 1 second
+            else:
+                self.timer.stop() #stops the timer
+            return None
+        raise ValueError("Time: not a number")
+            
 
-    def updateGraph(self):
+    def updateGraph(self,time = 1000):
+        """
+        Define the action to take at timeout update graph
+        Receives:
+            time = 1000 (int, optional): time interval
+        """
         # Generate new data for the plot
         self.xlim += 1
         self.div = self.xlim
         self.x = np.linspace(0,self.xlim,self.div) ##self.comando("1")
         self.y = np.sin(self.x)
-        self.t += 1
+        self.t += time / 1000
         self.xval.append(self.t)
         valor = self.comando("1")
         print(valor)
