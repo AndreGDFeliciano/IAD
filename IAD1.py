@@ -24,8 +24,8 @@ import time
 import sys
 
 #arduino=serial.Serial(port='/dev/tty.usbmodem1101',baudrate=9600,timeout=.1)
-#arduino=serial.Serial(port='/dev/cu.usbmodem1101',baudrate=9600,timeout=.1)
-arduino = serial.Serial(port="/dev/ttyACM0", baudrate= 9600, timeout=.1)
+arduino=serial.Serial(port='/dev/cu.usbmodem1101',baudrate=9600,timeout=.1)
+#arduino = serial.Serial(port="/dev/ttyACM0", baudrate= 9600, timeout=.1)
 
 
 class MyApp(QWidget):
@@ -127,7 +127,7 @@ class MyApp(QWidget):
         if isinstance(freq,float) and not freq:
             return 1000//freq
         raise ValueError("Freq: not a number")
-            
+
     def toggleGraphUpdate(self,time = 1000):
         """
         Sets the timer for updating graph at a set interval
@@ -141,7 +141,7 @@ class MyApp(QWidget):
                 self.timer.stop() #stops the timer
             return None
         raise ValueError("Time: not a number")
-            
+
 
     def updateGraph(self,time = 1000):
         """
