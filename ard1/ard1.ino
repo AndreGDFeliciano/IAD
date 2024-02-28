@@ -8,6 +8,7 @@ void setup() {
 	Serial.begin(9600);
 	Serial.setTimeout(.1);
 	pinMode(ledPin, OUTPUT);
+	pinMode(AnalogIn, INPUT);
 }
 void loop() {
 
