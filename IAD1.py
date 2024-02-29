@@ -25,7 +25,7 @@ import sys
 
 #arduino=serial.Serial(port='/dev/tty.usbmodem1101',baudrate=9600,timeout=.1)
 #arduino=serial.Serial(port='/dev/cu.usbmodem1101',baudrate=9600,timeout=.1)
-#arduino = serial.Serial(port="/dev/ttyACM0", baudrate= 9600, timeout=.1)
+arduino = serial.Serial(port="/dev/ttyACM0", baudrate= 9600, timeout=.1)
 
 
 class MyApp(QWidget):
@@ -35,12 +35,12 @@ class MyApp(QWidget):
         self.xval = []
         self.yval = []
         self.t    = 0
-        self.command  = "1"
+        self.command  = "2"
         self.time_int = 1000
         self.initUI()
 
     def initUI(self):
-        self.setGeometry(300, 300, 500, 400) # (x, y, width, height)
+        #self.setGeometry(300, 300, 500, 400) # (x, y, width, height)
         self.setWindowTitle('First IAD Project')
 
         # Creating Buttons with tooltips
@@ -52,14 +52,13 @@ class MyApp(QWidget):
         self.buttonCommand = QPushButton('Enviar 1 comando', self)
         self.buttonCommand.setToolTip(
                     'Enviar comando para arduino, devolve tensão(V)')
-        self.buttonCommand.clicked.connect(
-            lambda:self.callFunctionWithArgument('Hello from PyQt!'))
+        self.buttonCommand.clicked.connect(self.sendCommand)
 
         self.buttonStart = QPushButton('Start/Stop comandos periódicos', self)
-        self.buttonStart.setCheckable(True) # make it a toggle button
-        self.buttonStart.setChecked(False)  # Guarantee it starts turned off
         self.buttonStart.setToolTip(
                     'Envia comando periodicamente e atualiza gráfico')
+        self.buttonStart.setCheckable(True) # make it a toggle button
+        self.buttonStart.setChecked(False)  # Guarantee it starts turned off
         self.buttonStart.toggled.connect(self.toggleGraphUpdate)
 
         self.buttonChangeC = QPushButton('Change Command', self)
@@ -70,8 +69,8 @@ class MyApp(QWidget):
         self.buttonChangeT.setToolTip('Click to change time interval')
         self.buttonChangeT.clicked.connect(self.inputTime)
 
-        self.buttonCleanGraph = QPushButton('Clean Graph', self)
-        self.buttonCleanGraph.setToolTip('Click to clean the graph below')
+        self.buttonCleanGraph = QPushButton('Clear Graph', self)
+        self.buttonCleanGraph.setToolTip('Click to clear the graph below')
         self.buttonCleanGraph.clicked.connect(self.cleanGraph)
 
 
@@ -109,11 +108,11 @@ class MyApp(QWidget):
     def showMessageBox(self):
         QMessageBox.information(self, 'Message', 'You clicked the button!')
 
-    def callFunctionWithArgument(self, argument):
+    def sendCommand(self, argument):
         QMessageBox.information(self, 'Function Called',
-                f'Function called with argument:{self.comando(self.command)}')
+                f'Function called with argument:{self.comando()}')
 
-    def comando(self,argumento): # mudar argumento self.command
+    def comando(self): # mudar argumento self.command
         """
         Sends comando to arduino
         Receives:
@@ -121,14 +120,18 @@ class MyApp(QWidget):
         Returns:
             float: measured value
         """
-        arduino.write(bytes(argumento,"utf-8"))
+        arduino.write(bytes(self.command,"utf-8"))
         time.sleep(0.001) # wait for the arduino to write to the Serial in s
-        data = arduino.readline().decode("UTF-8")
-        if data == "Erro: comando inválido!":
-            raise ValueError(data)
+        read = arduino.readline().decode("UTF-8").rstrip()
+        if read == "Erro: comando inválido!":
+            QMessageBox.information(self, 'Invalid Command',
+                f'Function called with command: {self.command} \n \
+Correct command ("1") was reset')
+            self.command = "1"
+            raise ValueError("")
         else:
-            data = float(data)
-            return data
+            read = float(read)
+            return read
 
 
     def toggleGraphUpdate(self):
@@ -137,7 +140,6 @@ class MyApp(QWidget):
         Receives:
             time = 1000 (int, optional): time interval
         """
-
         if self.buttonStart.isChecked():
             self.new = True
             self.timer.start(self.time_int)  # Update every 1 second
@@ -153,7 +155,7 @@ class MyApp(QWidget):
             time = 1000 (int, optional): time interval
         """
         # Generate new data for the plot
-        valor = self.comando(self.command)
+        valor = self.comando()
         print(valor)
         self.yval.append(valor)
         self.xval.append(self.t)
@@ -165,12 +167,14 @@ class MyApp(QWidget):
         Changes the command to send in the comando function.
         Opens a window and asks for the user to write the new command.
         """
-        comm, ok = QInputDialog.getText(self, 'Input command',
+        comm, ok = QInputDialog.getInt(self, 'Input command',
                                     'Enter new command \nCorrect command: 1')
         if ok:
             QMessageBox.information(self, 'New Command',
                                     f'You entered: {comm}')
-            self.command = comm
+            self.command = str(comm)
+            self.comando()
+
 
     def inputTime(self):
         """
