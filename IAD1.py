@@ -23,7 +23,7 @@ import numpy as np
 import time
 import sys
 
-arduino=serial.Serial(port='/dev/tty.usbmodem1101',baudrate=9600,timeout=.1)
+#arduino=serial.Serial(port='/dev/tty.usbmodem1101',baudrate=9600,timeout=.1)
 #arduino=serial.Serial(port='/dev/cu.usbmodem1101',baudrate=9600,timeout=.1)
 #arduino = serial.Serial(port="/dev/ttyACM0", baudrate= 9600, timeout=.1)
 
@@ -41,7 +41,9 @@ class MyApp(QWidget):
 
     def initUI(self):
         self.setGeometry(300, 300, 500, 400) # (x, y, width, height)
-        self.setWindowTitle('My PyQt5 App')
+        self.setWindowTitle('First IAD Project')
+
+        # Creating Buttons with tooltips
 
         self.buttonTest = QPushButton('Test button', self)
         self.buttonTest.setToolTip('This is a <b>QPushButton</b> widget')
@@ -54,8 +56,8 @@ class MyApp(QWidget):
             lambda:self.callFunctionWithArgument('Hello from PyQt!'))
 
         self.buttonStart = QPushButton('Start/Stop comandos periódicos', self)
-        self.buttonStart.setCheckable(True)
-        self.buttonStart.setChecked(False)
+        self.buttonStart.setCheckable(True) # make it a toggle button
+        self.buttonStart.setChecked(False)  # Guarantee it starts turned off
         self.buttonStart.setToolTip(
                     'Envia comando periodicamente e atualiza gráfico')
         self.buttonStart.toggled.connect(self.toggleGraphUpdate)
@@ -75,12 +77,11 @@ class MyApp(QWidget):
 
         # Create layout
         layout = QVBoxLayout()
+
+        #Add buttons on top of the graphic
         layout.addWidget(self.buttonTest)
         layout.addWidget(self.buttonCommand)
         layout.addWidget(self.buttonStart)
-        layout.addWidget(self.buttonChangeC)
-        layout.addWidget(self.buttonChangeT)
-        layout.addWidget(self.buttonCleanGraph)
 
 
         # Create QtGraph plot
@@ -93,13 +94,17 @@ class MyApp(QWidget):
 
         # Add plot to layout
         layout.addWidget(self.plotWidget)
+        # Add the buttons below the graph
+        layout.addWidget(self.buttonChangeC)
+        layout.addWidget(self.buttonChangeT)
+        layout.addWidget(self.buttonCleanGraph)
 
         self.setLayout(layout)
 
         # Timer for periodic updates
         self.timer = QTimer(self)
+        # define what to do in the time "ticks" == "timeout"
         self.timer.timeout.connect(self.updateGraph)
-        #define what to do in the time "ticks" == "timeout"
 
     def showMessageBox(self):
         QMessageBox.information(self, 'Message', 'You clicked the button!')
@@ -108,7 +113,7 @@ class MyApp(QWidget):
         QMessageBox.information(self, 'Function Called',
                 f'Function called with argument:{self.comando(self.command)}')
 
-    def comando(self,argumento):
+    def comando(self,argumento): # mudar argumento self.command
         """
         Sends comando to arduino
         Receives:
@@ -117,7 +122,7 @@ class MyApp(QWidget):
             float: measured value
         """
         arduino.write(bytes(argumento,"utf-8"))
-        time.sleep(0.001) # wait for the arduino to write to the Serial
+        time.sleep(0.001) # wait for the arduino to write to the Serial in s
         data = arduino.readline().decode("UTF-8")
         if data == "Erro: comando inválido!":
             raise ValueError(data)
@@ -156,6 +161,10 @@ class MyApp(QWidget):
         self.plotWidget.plot(self.xval, self.yval, pen='b')
 
     def inputCommand(self):
+        """
+        Changes the command to send in the comando function.
+        Opens a window and asks for the user to write the new command.
+        """
         comm, ok = QInputDialog.getText(self, 'Input command',
                                     'Enter new command \nCorrect command: 1')
         if ok:
@@ -164,6 +173,10 @@ class MyApp(QWidget):
             self.command = comm
 
     def inputTime(self):
+        """
+        Changes the time interval for sending commands and updating graph.
+        Opens a window and asks for the user to write the new time interval.
+        """
         time, ok = QInputDialog.getInt(self, 'Input time interval',
                                         'Enter new time interval (ms):',
                                         min = 10)
@@ -173,6 +186,9 @@ class MyApp(QWidget):
             self.time_int = time
 
     def cleanGraph(self):
+        """
+        Cleans the graph
+        """
         self.plotWidget.clear()
         self.xval = []
         self.yval = []
