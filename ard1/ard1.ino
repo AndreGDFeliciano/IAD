@@ -12,14 +12,13 @@ void setup() {
 }
 void loop() {
   while (!Serial.available());
-	delay(5);
 	comando = Serial.readString().toInt();
 	if (comando == 1) {
     variable = analogRead(AnalogIn);
 		Serial.println(variable*5./1024.);
     digitalWrite(ledPin,LOW);
 	} else {
-    Serial.println("Erro: comando inválido!"); // Envia mensagem de erro
+    Serial.println("Error: Invalid Command"); // Envia mensagem de erro
     digitalWrite(ledPin,HIGH);
   }
 }
