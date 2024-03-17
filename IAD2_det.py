@@ -67,3 +67,6 @@ print(integ_mult/integ_em*100) # 39,34 %
 
 plt.scatter(mult_x,mult_y, label = "hist e plot")
 plt.show(block=True)
+
+N_det = 20000*0.3934261625894686
+print(N_det)
