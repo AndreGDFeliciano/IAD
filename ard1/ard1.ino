@@ -1,6 +1,8 @@
 // Sets up pins
 const int AnalogIn = A0;
 const int ledPin = 13;
+const int PinOut = 3;
+
 
 // Declare variables
 int comando;
@@ -11,7 +13,9 @@ void setup() {
 	Serial.begin(9600);
 	Serial.setTimeout(.1);
 	pinMode(ledPin, OUTPUT);
+	pinMode(PinOut, OUTPUT);
 	pinMode(AnalogIn, INPUT);
+  
 }
 void loop() {
 	while (!Serial.available()); // Waits for a command from the RaspberryPi
