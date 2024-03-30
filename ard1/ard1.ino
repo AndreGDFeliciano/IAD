@@ -2,6 +2,7 @@
 const int AnalogIn = A0;
 const int ledPin = 13;
 const int PinOut = 3;
+const int pwmPin = 9; // PWM pin
 
 
 // Declare variables
@@ -15,7 +16,9 @@ void setup() {
 	pinMode(ledPin, OUTPUT);
 	pinMode(PinOut, OUTPUT);
 	pinMode(AnalogIn, INPUT);
-  
+	pinMode(pwmPin, OUTPUT); // Set the PWM pin as an output
+    analogWrite(pwmPin, 13); // Set the PWM duty cycle to approximately 5%
+
 }
 void loop() {
 	while (!Serial.available()); // Waits for a command from the RaspberryPi
