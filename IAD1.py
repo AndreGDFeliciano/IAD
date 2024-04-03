@@ -21,10 +21,11 @@ import serial
 import numpy as np
 import time
 import sys
+import time
 
 #arduino=serial.Serial(port='/dev/tty.usbmodem1101',baudrate=9600,timeout=.1)
-#arduino=serial.Serial(port='/dev/cu.usbmodem1101',baudrate=9600,timeout=.1)
-arduino = serial.Serial(port="/dev/ttyACM0", baudrate= 9600, timeout=.1)
+arduino=serial.Serial(port='/dev/cu.usbmodemF412FA75E7882',baudrate=9600,timeout=.1)
+#arduino = serial.Serial(port="/dev/ttyACM0", baudrate= 9600, timeout=.1)
 
 
 class MyApp(QWidget):
@@ -38,7 +39,7 @@ class MyApp(QWidget):
         self.t    = 0
         #Create a place to store command and time interval, set the default
         self.command  = "1"
-        self.time_int = 1000
+        self.time_int = 1 # só funciona em ms
         self.initUI()
 
     def initUI(self):
@@ -55,7 +56,7 @@ class MyApp(QWidget):
             Change time interval
             Clear graph
         """
-        self.showMaximized() #maximise window at start
+        #self.showMaximized() #maximise window at start
         self.setWindowTitle('First IAD Project')
 
         # Creating Buttons with tooltips
@@ -94,9 +95,9 @@ class MyApp(QWidget):
 
         # Create QtGraph plot
         self.plotWidget = PlotWidget()
-        self.plotWidget.setLabel('left', 'Voltage', units='V')
+        self.plotWidget.setLabel('left', 'Voltage (mV)') # units='mV'
         self.plotWidget.setLabel('bottom', 'Time', units='s')
-        self.plotWidget.setYRange(0, 5)
+        self.plotWidget.setYRange(0, 5000)
 
         self.plotWidget.plot(self.xval, self.yval, pen='b')
 
