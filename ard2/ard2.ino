@@ -17,7 +17,8 @@ int analog_out_bit;
 int n_muon;
 double analog_out_val;
 unsigned long timestamp; // Captura o timestamp do evento
-unsigned long timestamp_ant;
+unsigned long timestamp_ant = 0;
+unsigned long time_dif;
 bool det;
 ArduinoLEDMatrix matrix;
 
@@ -44,13 +45,14 @@ void loop() {
   //Serial.println(det);
 
   if (!det){
-    
-    timestamp = millis();
-    Serial.println(timestamp - timestamp_ant); // ignoramos as medicoes realizadas na primeira hora
-    timestamp_ant = millis();
-    displayAnimation();
 
-    delay(1000);
+    timestamp = millis();
+    time_dif = timestamp - timestamp_ant;
+    if (time_dif > 100){
+      Serial.println(time_dif); // ignoramos as medicoes realizadas na primeira hora
+      // displayAnimation();
+      timestamp_ant = timestamp;
+    }
   }
 
 
@@ -69,19 +71,19 @@ void loop() {
 
 // Declaração das animações
 const uint32_t animation1[][3] = {
-	{ 
+	{
     0x10000000,
-    0x0, 
+    0x0,
     0x0
 	},
-	{ 
-    0x10008000, 
-    0x0, 
+	{
+    0x10008000,
+    0x0,
     0x0
 	},
-	{ 
-    0x10008004, 
-    0x0, 
+	{
+    0x10008004,
+    0x0,
     0x0
 	},
 	{
