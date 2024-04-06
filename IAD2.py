@@ -10,212 +10,250 @@ Sends command to arduino and reads AnalogIn
 __author__ = "ist1100286 André Feliciano & ist1103132 Rodrigo Casimiro"
 __version__ = "42"
 
-
-
-from PyQt5.QtCore import QTimer
-from PyQt5.QtWidgets import QApplication,QWidget,QPushButton,\
-                            QMessageBox,QVBoxLayout,QInputDialog
-from pyqtgraph import PlotWidget
-import os
-import serial
-import numpy as np
-import time
 import sys
+import serial
+import signal
+import time
+import os
+import numpy as np
+import pyqtgraph as pg
+from PyQt5 import QtWidgets, QtGui, QtCore
+from collections import deque
+from datetime import datetime as date
 
-#arduino=serial.Serial(port='/dev/tty.usbmodem1101',baudrate=9600,timeout=.1)
-arduino=serial.Serial(port='/dev/cu.usbmodemF412FA75E7882',baudrate=9600,timeout=.1)
-#arduino = serial.Serial(port="/dev/ttyACM0", baudrate= 9600, timeout=.1)
+#from MouseHover import CustomPlotWidget
 
+class SerialHistogram(QtWidgets.QWidget):
+    def __init__(self, port, baudrate=9600, parent=None):
+        super(SerialHistogram, self).__init__(parent)
+        self.serial_port = serial.Serial(port, baudrate, timeout=1)
+        self.time_differences = deque(maxlen=100000)
+        self.timeStamps = deque(maxlen=100000)
 
-class MyApp(QWidget):
+        self.maxXRangeExp = 1000  # Default max X-axis range
+        self.maxXRangePoisson = 500000
+        self.numBinsExp = 20 # Default number of bins for Exp
+        self.numBinsPoisson = 25 # Default number of bins for Poisson
+        self.setupUi()
+        self.setupSerial()
 
-    def __init__(self):
-        super().__init__()
-        # Create lists to store values to graph
-        self.xval = []
-        self.yval = []
-        # Create time count
-        self.t    = 0
-        #Create a place to store command and time interval, set the default
-        self.command  = "1"
-        self.time_int = 1000
-        self.initUI()
+        folder_path = "/Users/rodrigocasimiro/Desktop/Data"
 
-    def initUI(self):
-        """
-        Starts the UI for the windows program
-        2 buttons:
-            Send 1 Command
-            Start/Stop periodic command
-        1 Graph:
-            yaxis: Voltage read in arduino
-            xaxis: time
-        3 buttons
-            Change comand
-            Change time interval
-            Clear graph
-        """
-        self.showMaximized() #maximise window at start
-        self.setWindowTitle('First IAD Project')
+        if not os.path.exists(folder_path):
+            print("ERROR")
 
-        # Creating Buttons with tooltips
-        self.buttonCommand = QPushButton('Send 1 command', self)
-        self.buttonCommand.setToolTip(
-                    'Send command for arduino to read voltage(V)')
-        self.buttonCommand.clicked.connect(self.sendCommand)
-
-        self.buttonStart = QPushButton('Start/Stop periodic command', self)
-        self.buttonStart.setToolTip(
-            'Sends commands periodically and updates graph while toggled')
-        self.buttonStart.setCheckable(True) # make it a toggle button
-        self.buttonStart.setChecked(False)  # Guarantee it starts turned off
-        self.buttonStart.toggled.connect(self.toggleGraphUpdate)
-
-        self.buttonChangeC = QPushButton('Change command', self)
-        self.buttonChangeC.setToolTip('Click to change command')
-        self.buttonChangeC.clicked.connect(self.inputCommand)
-
-        self.buttonChangeT = QPushButton('Change time interval', self)
-        self.buttonChangeT.setToolTip('Click to change time interval')
-        self.buttonChangeT.clicked.connect(self.inputTime)
-
-        self.buttonClearGraph = QPushButton('Clear graph', self)
-        self.buttonClearGraph.setToolTip('Click to clear the graph below')
-        self.buttonClearGraph.clicked.connect(self.clearGraph)
+        # Create the file within the specified folder
+        file_path = os.path.join(folder_path, "dataset_" + str(date.today()) + ".txt")
+        self.file = open(file_path, "w")
 
 
-        # Create layout
-        layout = QVBoxLayout()
+    def setupUi(self):
+        self.setWindowTitle('Muon Telescope')
+        self.mainLayout = QtWidgets.QHBoxLayout()
+        self.setLayout(self.mainLayout)
 
-        #Add buttons on top of the graphic
-        layout.addWidget(self.buttonCommand)
-        layout.addWidget(self.buttonStart)
+        button_style = ("QPushButton {"
+                        "background-color: #FFFFFF;"
+                        "color: #374c80;"
+                        "border-radius: 5px;"
+                        "padding: 6px;"
+                        "}")
 
+        """Exponential Histogram Controls"""
+        # Layout for histogram
+        self.exponentialLayout = QtWidgets.QVBoxLayout()
+        self.mainLayout.addLayout(self.exponentialLayout)
 
-        # Create QtGraph plot
-        self.plotWidget = PlotWidget()
-        self.plotWidget.setLabel('left', 'Voltage', units='V')
-        self.plotWidget.setLabel('bottom', 'Time', units='s')
-        self.plotWidget.setYRange(0, 5)
+        # Plot for histogram
+        self.exponentialPlotWidget = pg.PlotWidget()
+        self.exponentialLayout.addWidget(self.exponentialPlotWidget)
+        self.exponentialPlotWidget.setTitle("Histogram of Time Between Detections")
+        self.exponentialPlotWidget.setLabel('left', 'Absolute frequency')
+        self.exponentialPlotWidget.setLabel('bottom', 'Time between counts (ms)')
+        self.exponentialPlotWidget.showGrid(x=True, y=True)
+        self.exponentialPlotWidget.setBackground('#FFFFFF')
 
-        self.plotWidget.plot(self.xval, self.yval, pen='b')
+        # Button X-axis range
+        self.changeXAxisButtonExp = QtWidgets.QPushButton("Change X-axis Range")
+        self.exponentialLayout.addWidget(self.changeXAxisButtonExp)
+        self.changeXAxisButtonExp.setStyleSheet(button_style)
+        self.changeXAxisButtonExp.clicked.connect(self.changeXAxisRangeExp)
 
-        # Add plot to layout
-        layout.addWidget(self.plotWidget)
-        # Add the buttons below the graph
-        layout.addWidget(self.buttonChangeC)
-        layout.addWidget(self.buttonChangeT)
-        layout.addWidget(self.buttonClearGraph)
+        # Button number of bins
+        self.changeBinsButtonExp = QtWidgets.QPushButton("Change Number of Bins")
+        self.exponentialLayout.addWidget(self.changeBinsButtonExp)
+        self.changeBinsButtonExp.setStyleSheet(button_style)
+        self.changeBinsButtonExp.clicked.connect(self.changeNumberOfBinsExp)
 
-        self.setLayout(layout)
+        # Button to clear the plot
+        self.clearPlotButtonExp = QtWidgets.QPushButton("Clear Plot")
+        self.exponentialLayout.addWidget(self.clearPlotButtonExp)
+        self.clearPlotButtonExp.setStyleSheet(button_style)
+        self.clearPlotButtonExp.clicked.connect(self.clearPlotExp)
 
-        # Timer for periodic updates
-        self.timer = QTimer(self)
-        # define what to do in the time "ticks" == "timeout"
-        self.timer.timeout.connect(self.updateGraph)
+        # Button to save the plot
+        self.savePlotButtonExp = QtWidgets.QPushButton("Save Plot")
+        self.exponentialLayout.addWidget(self.savePlotButtonExp)
+        self.savePlotButtonExp.setStyleSheet(button_style)
+        self.savePlotButtonExp.clicked.connect(self.savePlotExp)
 
-    def sendCommand(self):
-        """
-        Creates a QMessageBox and sends a command to the arduino.
-        Reads the voltage in the arduino
-        """
-        QMessageBox.information(self, 'Command sent',
-                f'Voltage measured:{self.comando()}')
+        """Poisson Histogram Controls"""
+        # Layout for the new counts plot
+        self.poissonLayout = QtWidgets.QVBoxLayout()
+        self.mainLayout.addLayout(self.poissonLayout)
 
-    def comando(self):
-        """
-        Sends command to arduino..
-        Returns:
-            float: measured value
-        Error in case there is a wrong command or empty string
-        """
-        arduino.write(bytes(self.command,"utf-8"))
-        time.sleep(0.001) # wait for the arduino to write to the Serial in s
-        read = arduino.readline().decode("UTF-8").rstrip()
-        # rstring takes out the \n and \r at the end of the line
-        if read == "Error: Invalid command":
-            QMessageBox.information(self, 'Invalid Command',
-            f'Function called with command: {self.command} \n \
-Correct command ("1") was reset')
-            self.command = "1"
-            raise ValueError("Error: Invalid Command")
-        elif read == "": # in order to avoid the unknown error of empty string
-            raise ValueError("Empty string")
-        else:
-            read = float(read)
-            return read
+        # Plot for the new counts
+        self.poissonPlotWidget = pg.PlotWidget()
+        self.poissonLayout.addWidget(self.poissonPlotWidget)
+        self.poissonPlotWidget.setTitle("Place Holder")
+        self.poissonPlotWidget.setLabel('left', 'Place Holder')
+        self.poissonPlotWidget.setLabel('bottom', 'Place Holder (ms)')
+        self.poissonPlotWidget.showGrid(x=True, y=True)
+        self.poissonPlotWidget.setBackground('#FFFFFF')
 
+        # Button X-axis range
+        self.changeXAxisButtonPoisson = QtWidgets.QPushButton("Change X-axis Range")
+        self.poissonLayout.addWidget(self.changeXAxisButtonPoisson)
+        self.changeXAxisButtonPoisson.setStyleSheet(button_style)
+        self.changeXAxisButtonPoisson.clicked.connect(self.changeXAxisRangePoisson)
 
-    def toggleGraphUpdate(self):
-        """
-        Sets the timer for updating graph at the set interval.
-        """
-        if self.buttonStart.isChecked():
-            self.new = True
-            self.timer.start(self.time_int)  # timeout every 1 second
-        else:
-            self.new = False
-            self.timer.stop() #stops the timer
-        return None
+        # Button number of bins
+        self.changeBinsButtonPoisson = QtWidgets.QPushButton("Change Number of Bins")
+        self.poissonLayout.addWidget(self.changeBinsButtonPoisson)
+        self.changeBinsButtonPoisson.setStyleSheet(button_style)
+        self.changeBinsButtonPoisson.clicked.connect(self.changeNumberOfBinsPoisson)
 
-    def updateGraph(self):
-        """
-        Generate new data
-        Print value to terminal
-        Update graph
-        """
-        # Generate new data for the plot
-        value = self.comando()
-        print(value)
-        # Add time and value to lists to graph
-        self.yval.append(value)
-        self.xval.append(self.t)
-        self.t += self.time_int / 1000 # transform ms to s
-        self.plotWidget.plot(self.xval, self.yval, pen='b')
+        # Button to clear the plot
+        self.clearPlotButtonPoisson = QtWidgets.QPushButton("Clear Plot")
+        self.poissonLayout.addWidget(self.clearPlotButtonPoisson)
+        self.clearPlotButtonPoisson.setStyleSheet(button_style)
+        self.clearPlotButtonPoisson.clicked.connect(self.clearPlotPoisson)
 
-    def inputCommand(self):
-        """
-        Opens a window and asks for the user to choose the new command
-        Tests if it is the right command
-        """
-        comm, ok = QInputDialog.getInt(self, 'Input command',
-                                    'Enter new command \nCorrect command: 1')
+        # Button to save the plot
+        self.savePlotButtonPoisson = QtWidgets.QPushButton("Save Plot")
+        self.poissonLayout.addWidget(self.savePlotButtonPoisson)
+        self.savePlotButtonPoisson.setStyleSheet(button_style)
+        self.savePlotButtonPoisson.clicked.connect(self.savePlotPoisson)
+
+    def setupSerial(self):
+        self.timer = pg.QtCore.QTimer()
+        self.timer.timeout.connect(self.updateExponential)
+        self.timer.timeout.connect(self.updatePoisson)
+        self.timer.start(1000)  # Update interval in milliseconds
+
+    def getData(self):
+        try:
+            while self.serial_port.inWaiting() > 0:
+                time_since_last_pulse = self.serial_port.readline().decode("utf-8").rstrip()
+                time_since_last_pulse = float(time_since_last_pulse)
+
+                # Check if time_differences is not empty for cumulative calculation, else start from 0
+                if self.time_differences:
+                    cumulative_time = self.timeStamps[-1] + time_since_last_pulse
+                else:
+                    cumulative_time = time_since_last_pulse
+
+                self.time_differences.append(time_since_last_pulse)
+                self.timeStamps.append(cumulative_time)
+
+                # Call to write data to file
+                self.writeDataToFile(time_since_last_pulse)
+
+        except Exception as e:
+            print(f"Error in getData: {e}")
+
+    def writeDataToFile(self, time_difference):
+        """Write acquired data to file."""
+        if not self.time_differences:  # Check if it's the first event
+            time_difference = 0  # No previous event to calculate difference from
+
+        # Unix timestamp in seconds and microseconds
+        unix_time_seconds = int(time.time())
+        unix_time_microsecs = int((time.time() - unix_time_seconds) * 1_000_000)
+
+        # Format: count, unix_time_seconds, unix_time_microsecs, time_difference
+        line = f"{len(self.time_differences)}, {unix_time_seconds}, {unix_time_microsecs}, {time_difference}\n"
+        self.file.write(line)
+        self.file.flush()  # Ensure data is written to disk
+
+    def closeEvent(self, event):
+        """Ensures the file is closed properly"""
+        self.file.close()
+        super(SerialHistogram, self).closeEvent(event)
+
+    """Exponential funtions"""
+    def updateExponential(self):
+        """Updates the exponential plot based on the collected time differences."""
+        self.getData()
+        if len(self.time_differences) > 0:
+            y, x = np.histogram(list(self.time_differences), bins=self.numBinsExp, range=(0, self.maxXRangeExp))
+            self.exponentialPlotWidget.clear()
+            self.exponentialPlotWidget.plot(x, y, stepMode=True, fillLevel=0, brush=pg.mkBrush('#374c80'))
+
+    def changeXAxisRangeExp(self):
+        maxXRange, ok = QtWidgets.QInputDialog.getInt(self, "Change X-axis Range", "Enter new max X-axis value (ms):", value=self.maxXRangeExp, min=500)
         if ok:
-            QMessageBox.information(self, 'New Command',
-                                    f'You entered: {comm}')
-            # comm is an int and bytes function receives a string
-            self.command = str(comm)
-            self.comando()
+            self.maxXRangeExp = maxXRange
+            self.updateExponential()  # Update histogram to reflect new X-axis range immediately
 
-
-    def inputTime(self):
-        """
-        Opens a window and asks for the user to choose the new time interval.
-        In case the toggle is checked: clears the graph and keeps adding values
-        """
-        time, ok = QInputDialog.getInt(self, 'Input time interval',
-                                        'Enter new time interval (ms):',
-                                        min = 10)
+    def changeNumberOfBinsExp(self):
+        numBins, ok = QtWidgets.QInputDialog.getInt(self, "Change Number of Bins", "Enter new number of bins:", value=self.numBinsExp, min=1)
         if ok:
-            QMessageBox.information(self, 'Input Values',
-                                    f'You entered: {time}')
-            self.time_int = time
-        if self.buttonStart.isChecked():
-            self.clearGraph()
-            self.toggleGraphUpdate()
+            self.numBinsExp = numBins
+            self.updateExponential()  # Update histogram to reflect new number of bins immediately
 
-    def clearGraph(self):
-        """
-        Clears the graph
-        """
-        self.plotWidget.clear()
-        self.xval = []
-        self.yval = []
-        self.t    = 0
+    def clearPlotExp(self):
+        """Clear the plot and the underlying data."""
+        self.exponentialPlotWidget.clear()  # This clears the visual plot
+        self.time_differences.clear()
 
-# Starts the new window
+    def savePlotExp(self):
+        """Save the current plot to a file."""
+        # Define the file name and format. For example, 'histogram.png'
+        fileName, _ = QtWidgets.QFileDialog.getSaveFileName(self, "Save Plot", "", "PNG Image (*.png);;All Files (*)")
+        if fileName:
+            exporter = pg.exporters.ImageExporter(self.exponentialPlotWidget.plotItem)
+            exporter.export(fileName)
+
+
+    """Poisson funtions"""
+    def updatePoisson(self):
+        """Updates the Poisson plot based on the collected time differences."""
+        self.getData()
+        if len(self.timeStamps) > 0:
+            y, x = np.histogram(list(self.timeStamps), bins=self.numBinsPoisson, range=(0, self.maxXRangePoisson))
+            self.poissonPlotWidget.clear()
+            self.poissonPlotWidget.plot(x, y, stepMode=True, fillLevel=0, brush=pg.mkBrush('#374c80'))
+
+    def changeXAxisRangePoisson(self):
+        maxXRange, ok = QtWidgets.QInputDialog.getInt(self, "Change X-axis Range", "Enter new max X-axis value (ms):", value=self.maxXRangePoisson, min=500)
+        if ok:
+            self.maxXRangePoisson = maxXRange
+            self.updatePoisson()  # Update histogram to reflect new X-axis range immediately
+
+    def changeNumberOfBinsPoisson(self):
+        numBins, ok = QtWidgets.QInputDialog.getInt(self, "Change Number of Bins", "Enter new number of bins:", value=self.numBinsPoisson, min=1)
+        if ok:
+            self.numBinsPoisson = numBins
+            self.updatePoisson()  # Update histogram to reflect new number of bins immediately
+
+    def clearPlotPoisson(self):
+        """Clear the plot and the underlying data."""
+        self.poissonPlotWidget.clear()  # This clears the visual plot
+        self.timeStamps.clear()
+
+    def savePlotPoisson(self):
+        """Save the current Poisson plot to a file."""
+        fileName, _ = QtWidgets.QFileDialog.getSaveFileName(self, "Save Plot", "", "PNG Image (*.png);;All Files (*)")
+        if fileName:
+            exporter = pg.exporters.ImageExporter(self.poissonPlotWidget.plotItem)
+            exporter.export(fileName)
+
 if __name__ == '__main__':
-    app = QApplication(sys.argv)
-    ex = MyApp()
-    ex.show()
+    signal.signal(signal.SIGINT, signal.SIG_DFL) # ^C works this way
+
+    app = QtWidgets.QApplication(sys.argv)
+    window = SerialHistogram("/dev/cu.usbmodemF412FA75E7882")
+    window.resize(1000, 600)
+    window.show()
     sys.exit(app.exec_())
