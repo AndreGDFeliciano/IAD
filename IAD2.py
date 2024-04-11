@@ -168,8 +168,9 @@ class SerialHistogram(QtWidgets.QWidget):
             time_difference = 0  # No previous event to calculate difference from
 
         # Unix timestamp in seconds and microseconds
-        unix_time_seconds = int(time.time())
-        unix_time_microsecs = int((time.time() - unix_time_seconds) * 1_000_000)
+        current_time = time.time()
+        unix_time_seconds = int(current_time)
+        unix_time_microsecs = int((current_time - unix_time_seconds) * 1_000_000)
 
         # Format: count, unix_time_seconds, unix_time_microsecs, time_difference
         line = f"{len(self.time_differences)}, {unix_time_seconds}, {unix_time_microsecs}, {time_difference}\n"
