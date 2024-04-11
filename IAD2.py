@@ -21,6 +21,8 @@ from PyQt5 import QtWidgets, QtGui, QtCore
 from collections import deque
 from datetime import datetime as date
 
+arduinoPort = "/dev/cu.usbmodemF412FA75E7882"
+
 #from MouseHover import CustomPlotWidget
 
 class SerialHistogram(QtWidgets.QWidget):
@@ -254,7 +256,7 @@ if __name__ == '__main__':
     signal.signal(signal.SIGINT, signal.SIG_DFL) # ^C works this way
 
     app = QtWidgets.QApplication(sys.argv)
-    window = SerialHistogram("/dev/cu.usbmodemF412FA75E7882")
+    window = SerialHistogram(arduinoPort)
     window.resize(1000, 600)
     window.show()
     sys.exit(app.exec_())
