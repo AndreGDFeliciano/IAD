@@ -1,5 +1,6 @@
 // Parameters
 int threshold = 30;
+int debounceTime = 10;
 
 // Sets up pins
 const int AnalogOut = A0;
@@ -35,39 +36,30 @@ void setup() {
 }
 
 void loop() {
-  maxVal = 0;
   time_dif = millis() - timestamp_ant;
+  det = analogRead(AnalogIn);
 
 //  if (time_dif > 60000){
 //    threshold = threshold + 5; // Increase threshold every 60 seconds
 //    timestamp_ant = millis();
 //  }
-  det = analogRead(AnalogIn);
-  while (det > threshold && threshold < 100) {
-    if (maxVal == 0) {
-      initialTime = millis();
-    }  
-    Serial.println(det);
-    if (det > maxVal) {
-      maxVal = det;
-    }
-    det = analogRead(AnalogIn);
+
+  if (det > threshold && threshold < 100) {
+    initialTime = millis();
+    prints();
+    lastPulse = initialTime;
   }
-  finalTime = millis();
-  
-  if (maxVal > 0) {
-    // Print output:
-    // Threshold (mV); Peak Value (mV); Time Stamp (ms); Time between Muons (ms); Peak Width (ms) 
-    Serial.print(threshold*5000/1024); // mV
-    Serial.print(" ");
-    Serial.print(maxVal*5000/1024); // mV
-    Serial.print(" ");
-    Serial.print(initialTime - timeStart); // ms
-    Serial.print(" ");
-    Serial.print(initialTime - lastPulse); // ms
-    Serial.print(" ");
-    Serial.print(finalTime - initialTime); // ms
-    Serial.println();
-  }
-  lastPulse = initialTime;
+}
+
+void prints() {
+  // Print output:
+  // Threshold (mV); Peak Value (mV); Time Stamp (ms); Time between Muons (ms)
+  Serial.print(threshold*5000/1024); // mV
+  Serial.print(" ");
+  Serial.print(det*5000/1024); // mV
+  Serial.print(" ");
+  Serial.print(initialTime - timeStart); // ms
+  Serial.print(" ");
+  Serial.print(initialTime - lastPulse); // ms
+  Serial.println();
 }
