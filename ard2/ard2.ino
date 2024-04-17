@@ -1,13 +1,15 @@
 // Parameters
-int threshold = 30;
-int debounceTime = 10;
+int initialThreshold = 10;
+int upperThreshold = 100;
+int timeThreshold_s = 600; // Seconds
+int debounceTime = 30;
 
 // Sets up pins
-const int AnalogOut = A0;
-const int AnalogIn  = A1;
+int AnalogIn  = 15;
 // const int PinPwm = 9; // PWM pin
 
 // Declare variables
+int threshold = initialThreshold;
 int time_dif = 0;
 unsigned long timestamp_ant = 0;
 int det;
@@ -39,21 +41,30 @@ void loop() {
   time_dif = millis() - timestamp_ant;
   det = analogRead(AnalogIn);
 
-//  if (time_dif > 60000){
-//    threshold = threshold + 5; // Increase threshold every 60 seconds
-//    timestamp_ant = millis();
-//  }
+  if (time_dif > timeThreshold_s * 1000){
+    threshold = threshold + 1; // Increase threshold every N seconds
+    timestamp_ant = millis();
+  }
 
-  if (det > threshold && threshold < 100) {
+  if (det > threshold && threshold < upperThreshold) {
     initialTime = millis();
     prints();
     lastPulse = initialTime;
+    delay(debounceTime);
+  }
+
+  if (threshold == upperThreshold && AnalogIn == 15) {
+    AnalogIn = AnalogIn + 1;
+    threshold = initialThreshold;
   }
 }
+
 
 void prints() {
   // Print output:
   // Threshold (mV); Peak Value (mV); Time Stamp (ms); Time between Muons (ms)
+  Serial.print(AnalogIn); // PIN
+  Serial.print(" ");
   Serial.print(threshold*5000/1024); // mV
   Serial.print(" ");
   Serial.print(det*5000/1024); // mV
