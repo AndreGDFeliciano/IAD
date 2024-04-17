@@ -1,60 +1,73 @@
 // Parameters
-
-
+int threshold = 30;
 
 // Sets up pins
 const int AnalogOut = A0;
 const int AnalogIn  = A1;
-const int PinOut = 3;
-const int PinIn = 4;
-const int PinPwm = 9; // PWM pin
+// const int PinPwm = 9; // PWM pin
 
 // Declare variables
-int threshold = 20;
-int comando;
-int variable;
-int analog_out_bit;
-int n_muon;
-double analog_out_val;
 int time_dif = 0;
-unsigned long timestamp; // Captura o timestamp do evento
 unsigned long timestamp_ant = 0;
 int det;
-int num = 2;
+int initialTime;
+int finalTime;
+int maxVal;
+int lastPulse = 0; // Está mal na primeira deteçao! 
+int timeStart;
 
 
-// Serial and pin setup
 void setup() {
 	Serial.begin(9600);
-	// Serial.setTimeout(10);
-  analog_out_val = 2000; // mV
-  analog_out_bit = (analog_out_val * 4095/ 5000);
-	// pinMode(PinOut, OUTPUT);
-	// pinMode(PinIn, INPUT);
 	pinMode(AnalogIn, INPUT);
-  // pinMode(PinPwm, OUTPUT); // Set the PWM pin as an output
-  // analogWrite(PinPwm, 1); // Set the PWM duty cycle to approximately 5%
-  // analogWriteResolution(12); // 12 bits
-  // analogWrite(AnalogOut,analog_out_bit); // Value = (desired value / 5V) * 4095 (2^12-1)
 
-  int timeStart = millis();
-  // matrix.begin();
+  delay(3000); // Delay to start .py code
+  
+  timeStart = millis();
   timestamp_ant = millis();
-  delay(3000);
+
+  /* PWM
+	pinMode(PinOut, OUTPUT);
+	pinMode(PinIn, INPUT);
+  pinMode(PinPwm, OUTPUT); // Set the PWM pin as an output
+  analogWrite(PinPwm, 1); // Set the PWM duty cycle to approximately 5%
+  */
 }
 
 void loop() {
-  det = analogRead(AnalogIn);
-  // Serial.println(det);
+  maxVal = 0;
   time_dif = millis() - timestamp_ant;
-  if (time_dif > 60000 ){
-    threshold = threshold + 5;
-    timestamp_ant = millis();
+
+//  if (time_dif > 60000){
+//    threshold = threshold + 5; // Increase threshold every 60 seconds
+//    timestamp_ant = millis();
+//  }
+  det = analogRead(AnalogIn);
+  while (det > threshold && threshold < 100) {
+    if (maxVal == 0) {
+      initialTime = millis();
+    }  
+    Serial.println(det);
+    if (det > maxVal) {
+      maxVal = det;
+    }
+    det = analogRead(AnalogIn);
   }
-  if (det > threshold && threshold < 100) {
-    delay(20);
+  finalTime = millis();
+  
+  if (maxVal > 0) {
+    // Print output:
+    // Threshold (mV); Peak Value (mV); Time Stamp (ms); Time between Muons (ms); Peak Width (ms) 
     Serial.print(threshold*5000/1024); // mV
     Serial.print(" ");
-    Serial.println(det);
+    Serial.print(maxVal*5000/1024); // mV
+    Serial.print(" ");
+    Serial.print(initialTime - timeStart); // ms
+    Serial.print(" ");
+    Serial.print(initialTime - lastPulse); // ms
+    Serial.print(" ");
+    Serial.print(finalTime - initialTime); // ms
+    Serial.println();
   }
+  lastPulse = initialTime;
 }
