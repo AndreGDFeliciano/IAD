@@ -2,19 +2,18 @@
 int threshold1 = 21; // bins
 int threshold2 = 21; // bins
 int debounceTime = 30; // ms
+const int coincidenceWindow = 200; // μs
 
 // Sets up pins
-int firstAnalogIn  = 15; // A0
-int secondAnalogIn  = 16; // A1
-// const int PinPwm = 9; // PWM pin
+int firstAnalogIn  = 15; // A1
+int secondAnalogIn  = 16; // A2
 
 // Declare variables
 int initialTime;
-int lastPulse = 0; // Está mal na primeira deteçao!
 int timeStart;
-volatile int det1;
-volatile int det2;
-
+int lastPulse = 0; // Wrong first detection
+volatile int det1, det2;
+volatile unsigned long timeDet1 = 0, timeDet2 = 0;
 
 void setup() {
 	Serial.begin(9600);
@@ -23,34 +22,40 @@ void setup() {
 
   delay(3000); // Delay to start .py code
 
-  timeStart = millis();
-
-  /* PWM
-	pinMode(PinOut, OUTPUT);
-	pinMode(PinIn, INPUT);
-  pinMode(PinPwm, OUTPUT); // Set the PWM pin as an output
-  analogWrite(PinPwm, 1); // Set the PWM duty cycle to approximately 5%
-  */
+  timeStart = micros();
+  lastPulse = timeStart;
 }
 
 void loop() {
+  int Time1 = micros();
   det1 = analogRead(firstAnalogIn);
   det2 = analogRead(secondAnalogIn);
 
-  if (det1 > threshold1 && det2 > threshold2) {
-    initialTime = millis();
-    if (initialTime - lastPulse > debounceTime) {
+  if (det1 > threshold1) {
+      timeDet1 = micros();
+  }
+  if (det2 > threshold2) {
+      timeDet2 = micros();
+  }
+
+  // Check the coincidence window
+  if (abs((int)(timeDet1 - timeDet2)) <= coincidenceWindow && timeDet1 && timeDet2) {
+    initialTime = micros();
+
+    // Check debounce time
+    if (initialTime - lastPulse > debounceTime*1000) {
       // Print output:
-      // Peak Value average (mV); Time Stamp (ms); Time between Muons (ms)
+      // Peak Value average (mV); Time Stamp (μs); Time between Muons (μs)
       Serial.print((det1+det2)*5000/2048); // mV
       Serial.print(" ");
-      Serial.print(initialTime - timeStart); // ms
+      Serial.print(initialTime - timeStart); // μs
       Serial.print(" ");
-      Serial.print(initialTime - lastPulse); // ms
-      Serial.println();
+      Serial.println(initialTime - lastPulse); // μs
 
       lastPulse = initialTime;
     }
+    timeDet1 = 0;
+    timeDet2 = 0;
   }
-  delay(0.1);
+  delay(0.001);
 }
