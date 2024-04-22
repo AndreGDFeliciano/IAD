@@ -1,76 +1,61 @@
 // Parameters
-int initialThreshold = 10;
-int upperThreshold = 100;
-int timeThreshold_s = 600; // Seconds
-int debounceTime = 30;
+int threshold1 = 21; // bins
+int threshold2 = 21; // bins
+int debounceTime = 30; // ms
+const int coincidenceWindow = 200; // μs
 
 // Sets up pins
-int AnalogIn  = 15;
-// const int PinPwm = 9; // PWM pin
+int firstAnalogIn  = 15; // A1
+int secondAnalogIn  = 16; // A2
 
 // Declare variables
-int threshold = initialThreshold;
-int time_dif = 0;
-unsigned long timestamp_ant = 0;
-int det;
 int initialTime;
-int finalTime;
-int maxVal;
-int lastPulse = 0; // Está mal na primeira deteçao! 
 int timeStart;
-
+int lastPulse = 0; // Wrong first detection
+volatile int det1, det2;
+volatile unsigned long timeDet1 = 0, timeDet2 = 0;
 
 void setup() {
 	Serial.begin(9600);
-	pinMode(AnalogIn, INPUT);
+	pinMode(firstAnalogIn, INPUT);
+	pinMode(secondAnalogIn, INPUT);
 
   delay(3000); // Delay to start .py code
-  
-  timeStart = millis();
-  timestamp_ant = millis();
 
-  /* PWM
-	pinMode(PinOut, OUTPUT);
-	pinMode(PinIn, INPUT);
-  pinMode(PinPwm, OUTPUT); // Set the PWM pin as an output
-  analogWrite(PinPwm, 1); // Set the PWM duty cycle to approximately 5%
-  */
+  timeStart = micros();
+  lastPulse = timeStart;
 }
 
 void loop() {
-  time_dif = millis() - timestamp_ant;
-  det = analogRead(AnalogIn);
+  int Time1 = micros();
+  det1 = analogRead(firstAnalogIn);
+  det2 = analogRead(secondAnalogIn);
 
-  if (time_dif > timeThreshold_s * 1000){
-    threshold = threshold + 1; // Increase threshold every N seconds
-    timestamp_ant = millis();
+  if (det1 > threshold1) {
+      timeDet1 = micros();
+  }
+  if (det2 > threshold2) {
+      timeDet2 = micros();
   }
 
-  if (det > threshold && threshold < upperThreshold) {
-    initialTime = millis();
-    prints();
-    lastPulse = initialTime;
-    delay(debounceTime);
+  // Check the coincidence window
+  if (abs((int)(timeDet1 - timeDet2)) <= coincidenceWindow && timeDet1 && timeDet2) {
+    initialTime = micros();
+
+    // Check debounce time
+    if (initialTime - lastPulse > debounceTime*1000) {
+      // Print output:
+      // Peak Value average (mV); Time Stamp (μs); Time between Muons (μs)
+      Serial.print((det1+det2)*5000/2048); // mV
+      Serial.print(" ");
+      Serial.print(initialTime - timeStart); // μs
+      Serial.print(" ");
+      Serial.println(initialTime - lastPulse); // μs
+
+      lastPulse = initialTime;
+    }
+    timeDet1 = 0;
+    timeDet2 = 0;
   }
-
-  if (threshold == upperThreshold && AnalogIn == 15) {
-    AnalogIn = AnalogIn + 1;
-    threshold = initialThreshold;
-  }
-}
-
-
-void prints() {
-  // Print output:
-  // Threshold (mV); Peak Value (mV); Time Stamp (ms); Time between Muons (ms)
-  Serial.print(AnalogIn); // PIN
-  Serial.print(" ");
-  Serial.print(threshold*5000/1024); // mV
-  Serial.print(" ");
-  Serial.print(det*5000/1024); // mV
-  Serial.print(" ");
-  Serial.print(initialTime - timeStart); // ms
-  Serial.print(" ");
-  Serial.print(initialTime - lastPulse); // ms
-  Serial.println();
+  delay(0.001);
 }
