@@ -17,13 +17,13 @@ import time
 import os
 import numpy as np
 import pyqtgraph as pg
+from pyqtgraph.exporters import ImageExporter
 from PyQt5 import QtWidgets, QtGui, QtCore
 from collections import deque
 from datetime import datetime as date
+from PyQt5.QtWidgets import QMessageBox
 
 arduinoPort = "/dev/cu.usbmodemF412FA75E7882"
-
-#from MouseHover import CustomPlotWidget
 
 class SerialHistogram(QtWidgets.QWidget):
     def __init__(self, port, baudrate=9600, parent=None):
@@ -32,10 +32,10 @@ class SerialHistogram(QtWidgets.QWidget):
         self.time_differences = deque(maxlen=100000)
         self.timeStamps = deque(maxlen=100000)
 
-        self.maxXRangeExp = 1000  # Default max X-axis range
-        self.maxXRangePoisson = 500000
-        self.numBinsExp = 20 # Default number of bins for Exp
-        self.numBinsPoisson = 25 # Default number of bins for Poisson
+        self.maxXRangeExp = 15000  # Default max X-axis range (ms)
+        self.maxXRangePoisson = 24 # Default max X-axis range (hours)
+        self.numBinsExp = 30 # Default number of bins for Exp
+        self.numBinsPoisson = 48 # Default number of bins for Poisson
         self.setupUi()
         self.setupSerial()
 
@@ -107,9 +107,9 @@ class SerialHistogram(QtWidgets.QWidget):
         # Plot for the new counts
         self.poissonPlotWidget = pg.PlotWidget()
         self.poissonLayout.addWidget(self.poissonPlotWidget)
-        self.poissonPlotWidget.setTitle("Place Holder")
-        self.poissonPlotWidget.setLabel('left', 'Place Holder')
-        self.poissonPlotWidget.setLabel('bottom', 'Place Holder (ms)')
+        self.poissonPlotWidget.setTitle("Histogram of number of counts per hour")
+        self.poissonPlotWidget.setLabel('left', 'Absolute frequency')
+        self.poissonPlotWidget.setLabel('bottom', 'Time', units='h')
         self.poissonPlotWidget.showGrid(x=True, y=True)
         self.poissonPlotWidget.setBackground('#FFFFFF')
 
@@ -138,6 +138,7 @@ class SerialHistogram(QtWidgets.QWidget):
         self.savePlotButtonPoisson.clicked.connect(self.savePlotPoisson)
 
     def setupSerial(self):
+        """Update the """
         self.timer = pg.QtCore.QTimer()
         self.timer.timeout.connect(self.updateExponential)
         self.timer.timeout.connect(self.updatePoisson)
@@ -146,42 +147,35 @@ class SerialHistogram(QtWidgets.QWidget):
     def getData(self):
         try:
             while self.serial_port.inWaiting() > 0:
-                time_since_last_pulse = self.serial_port.readline().decode("utf-8").rstrip()
-                time_since_last_pulse = float(time_since_last_pulse)
+                line = self.serial_port.readline().decode("utf-8").rstrip()
+                if line:
+                    peak1, peak2, time_stamp, time_since_last_pulse = map(int, line.split())
 
-                # Check if time_differences is not empty for cumulative calculation, else start from 0
-                if self.time_differences:
-                    cumulative_time = self.timeStamps[-1] + time_since_last_pulse
-                else:
-                    cumulative_time = time_since_last_pulse
+                    self.time_differences.append(time_since_last_pulse//1000)
+                    self.timeStamps.append(time_stamp/1000000/3600)
 
-                self.time_differences.append(time_since_last_pulse)
-                self.timeStamps.append(cumulative_time)
-
-                # Call to write data to file
-                self.writeDataToFile(time_since_last_pulse)
+                    # Write data to file
+                    self.writeDataToFile(peak1, peak2, time_stamp, time_since_last_pulse)
 
         except Exception as e:
             print(f"Error in getData: {e}")
 
-    def writeDataToFile(self, time_difference):
+    def writeDataToFile(self, peak1, peak2, time_stamp, time_since_last_pulse):
         """Write acquired data to file."""
-        if not self.time_differences:  # Check if it's the first event
-            time_difference = 0  # No previous event to calculate difference from
 
         # Unix timestamp in seconds and microseconds
         current_time = time.time()
         unix_time_seconds = int(current_time)
-        unix_time_microsecs = int((current_time - unix_time_seconds) * 1_000_000)
 
-        # Format: count, unix_time_seconds, unix_time_microsecs, time_difference
-        line = f"{len(self.time_differences)}, {unix_time_seconds}, {unix_time_microsecs}, {time_difference}\n"
+        # Format: count; unix_time_seconds (s); peak1 (mV); peak2(mV); time_stamp(μs); time_since_last_pulse (μs)
+        line = f"{len(self.time_differences)} {unix_time_seconds} {peak1} {peak2} {time_stamp} {time_since_last_pulse}\n"
         self.file.write(line)
-        self.file.flush()  # Ensure data is written to disk
+        self.file.flush() # Ensure data is written to disk
 
     def closeEvent(self, event):
         """Ensures the file is closed properly"""
         self.file.close()
+        self.serial_port.close()
         super(SerialHistogram, self).closeEvent(event)
 
     """Exponential funtions"""
@@ -189,12 +183,12 @@ class SerialHistogram(QtWidgets.QWidget):
         """Updates the exponential plot based on the collected time differences."""
         self.getData()
         if len(self.time_differences) > 0:
-            y, x = np.histogram(list(self.time_differences), bins=self.numBinsExp, range=(0, self.maxXRangeExp))
+            y, x = np.histogram(list(self.time_differences), bins=self.numBinsExp, range=(34, self.maxXRangeExp))
             self.exponentialPlotWidget.clear()
             self.exponentialPlotWidget.plot(x, y, stepMode=True, fillLevel=0, brush=pg.mkBrush('#374c80'))
 
     def changeXAxisRangeExp(self):
-        maxXRange, ok = QtWidgets.QInputDialog.getInt(self, "Change X-axis Range", "Enter new max X-axis value (ms):", value=self.maxXRangeExp, min=500)
+        maxXRange, ok = QtWidgets.QInputDialog.getInt(self, "Change X-axis Range", "Enter new max X-axis value (ms):", value=self.maxXRangeExp, min=100)
         if ok:
             self.maxXRangeExp = maxXRange
             self.updateExponential()  # Update histogram to reflect new X-axis range immediately
@@ -210,14 +204,6 @@ class SerialHistogram(QtWidgets.QWidget):
         self.exponentialPlotWidget.clear()  # This clears the visual plot
         self.time_differences.clear()
 
-    def savePlotExp(self):
-        """Save the current plot to a file."""
-        # Define the file name and format. For example, 'histogram.png'
-        fileName, _ = QtWidgets.QFileDialog.getSaveFileName(self, "Save Plot", "", "PNG Image (*.png);;All Files (*)")
-        if fileName:
-            exporter = pg.exporters.ImageExporter(self.exponentialPlotWidget.plotItem)
-            exporter.export(fileName)
-
 
     """Poisson funtions"""
     def updatePoisson(self):
@@ -229,7 +215,9 @@ class SerialHistogram(QtWidgets.QWidget):
             self.poissonPlotWidget.plot(x, y, stepMode=True, fillLevel=0, brush=pg.mkBrush('#374c80'))
 
     def changeXAxisRangePoisson(self):
-        maxXRange, ok = QtWidgets.QInputDialog.getInt(self, "Change X-axis Range", "Enter new max X-axis value (ms):", value=self.maxXRangePoisson, min=500)
+        maxXRange, ok = QtWidgets.QInputDialog.getInt(self, "Change X-axis Range",
+                                                     "Enter new max X-axis value (hours):",
+                                                     value=self.maxXRangePoisson, min=1)
         if ok:
             self.maxXRangePoisson = maxXRange
             self.updatePoisson()  # Update histogram to reflect new X-axis range immediately
@@ -245,12 +233,39 @@ class SerialHistogram(QtWidgets.QWidget):
         self.poissonPlotWidget.clear()  # This clears the visual plot
         self.timeStamps.clear()
 
+    def savePlot(self, plotWidget, defaultName="plot"):
+        """Generalized save plot method for any plot widget."""
+        folder_path = QtWidgets.QFileDialog.getExistingDirectory(self, "Select Folder")
+        if not folder_path:
+            return
+
+        today_date = date.today().strftime("%Y-%m-%d")
+        fileName, _ = QtWidgets.QFileDialog.getSaveFileName(
+            self, "Save Plot", os.path.join(folder_path, f"{defaultName}_{today_date}.png"),
+            "PNG Image (*.png);;All Files (*)"
+        )
+
+        if fileName:
+            if not fileName.endswith('.png'):
+                fileName += '.png'
+            try:
+                exporter = pg.exporters.ImageExporter(plotWidget.plotItem)
+                exporter.export(fileName)
+                QMessageBox.information(self, "Success", "Plot saved successfully!")
+            except Exception as e:
+                QMessageBox.critical(self, "Error", f"Failed to save the file: {str(e)}")
+                print(f"Error saving the plot: {e}")
+        else:
+            QMessageBox.warning(self, "Cancelled", "Save operation cancelled.")
+
+    def savePlotExp(self):
+        """Save the current exponential plot to a file."""
+        self.savePlot(self.exponentialPlotWidget, "exponential_histogram")
+
     def savePlotPoisson(self):
         """Save the current Poisson plot to a file."""
-        fileName, _ = QtWidgets.QFileDialog.getSaveFileName(self, "Save Plot", "", "PNG Image (*.png);;All Files (*)")
-        if fileName:
-            exporter = pg.exporters.ImageExporter(self.poissonPlotWidget.plotItem)
-            exporter.export(fileName)
+        self.savePlot(self.poissonPlotWidget, "poisson_histogram")
+
 
 if __name__ == '__main__':
     signal.signal(signal.SIGINT, signal.SIG_DFL) # ^C works this way
