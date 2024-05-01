@@ -1,15 +1,18 @@
 """
+Muon Telescope
 Project 2 - Instrumentação e Aquisição de Dados
 Group 5
-Project using arduino Uno and raspberry pi3
-languages: C and python3
+Languages: C and python3
 
-Sends command to arduino and reads AnalogIn
+This script communicates with an Arduino to read AnalogIn data, and uses PyQt5 to display
+histograms of the data, as well as offering the functionality to save the plotted data.
 """
+
 
 __author__ = "ist1100286 André Feliciano & ist1103132 Rodrigo Casimiro"
 __version__ = "42"
 
+"""Necessary libraries"""
 import sys
 import serial
 import signal
@@ -26,23 +29,27 @@ from PyQt5.QtWidgets import QMessageBox
 arduinoPort = "/dev/cu.usbmodemF412FA75E7882"
 
 class SerialHistogram(QtWidgets.QWidget):
+    """A widget for displaying histograms of time differences
+    and count frequencies from Arduino data."""
     def __init__(self, port, baudrate=9600, parent=None):
+        """Initialize the serial port and set up the UI"""
         super(SerialHistogram, self).__init__(parent)
-        self.serial_port = serial.Serial(port, baudrate, timeout=1)
+        self.serial_port = serial.Serial(port, baudrate, timeout=1) # Serial
         self.time_differences = deque(maxlen=100000)
         self.timeStamps = deque(maxlen=100000)
 
-        self.maxXRangeExp = 15000  # Default max X-axis range (ms)
-        self.maxXRangePoisson = 24 # Default max X-axis range (hours)
-        self.numBinsExp = 30 # Default number of bins for Exp
-        self.numBinsPoisson = 48 # Default number of bins for Poisson
+        self.maxXRangeExp = 15000  # Default X-axis max Exponential (ms)
+        self.maxXRangePoisson = 24 # Default X-axis max Histogram (hours)
+        self.numBinsExp = 30       # Default number of bins for Exp
+        self.numBinsPoisson = 48   # Default number of bins for Histogram
+
         self.setupUi()
         self.setupSerial()
 
         folder_path = "/Users/rodrigocasimiro/Desktop/Data"
 
         if not os.path.exists(folder_path):
-            print("ERROR")
+            print("ERROR: Data folder does not exist.")
 
         # Create the file within the specified folder
         file_path = os.path.join(folder_path, "dataset_" + str(date.today()) + ".txt")
@@ -50,6 +57,23 @@ class SerialHistogram(QtWidgets.QWidget):
 
 
     def setupUi(self):
+        """
+        Sets up the User Interface for the Muon Telescope application.
+        The UI includes:
+        - Histogram controls for both exponential and Poisson data:
+          * Two plot widgets for displaying histograms.
+          * Four buttons for each histogram:
+            1. Change X-axis Range
+            2. Change Number of Bins
+            3. Clear Plot
+            4. Save Plot
+        - Layouts:
+          * Exponential Layout: Controls and plot for the time between detections.
+          * Poisson Layout: Controls and plot for the count of detections per hour.
+        - Styling:
+          * Sets button styles and adds widgets to layouts.
+        """
+        
         self.setWindowTitle('Muon Telescope')
         self.mainLayout = QtWidgets.QHBoxLayout()
         self.setLayout(self.mainLayout)
@@ -138,21 +162,22 @@ class SerialHistogram(QtWidgets.QWidget):
         self.savePlotButtonPoisson.clicked.connect(self.savePlotPoisson)
 
     def setupSerial(self):
-        """Update the """
+        """Set up a timer to update the histogram plots periodically."""
         self.timer = pg.QtCore.QTimer()
         self.timer.timeout.connect(self.updateExponential)
         self.timer.timeout.connect(self.updatePoisson)
         self.timer.start(1000)  # Update interval in milliseconds
 
     def getData(self):
+        """Read data from the serial port and process it."""
         try:
             while self.serial_port.inWaiting() > 0:
                 line = self.serial_port.readline().decode("utf-8").rstrip()
                 if line:
                     peak1, peak2, time_stamp, time_since_last_pulse = map(int, line.split())
 
-                    self.time_differences.append(time_since_last_pulse//1000)
-                    self.timeStamps.append(time_stamp/1000000/3600)
+                    self.time_differences.append(time_since_last_pulse//1000) # Convert to milliseconds
+                    self.timeStamps.append(time_stamp/1000000/3600) # Convert to hours
 
                     # Write data to file
                     self.writeDataToFile(peak1, peak2, time_stamp, time_since_last_pulse)
@@ -173,7 +198,9 @@ class SerialHistogram(QtWidgets.QWidget):
         self.file.flush() # Ensure data is written to disk
 
     def closeEvent(self, event):
-        """Ensures the file is closed properly"""
+        """Ensure the file and serial port are closed properly
+        when the application is closed."""
+        self.file.close()
         self.file.close()
         self.serial_port.close()
         super(SerialHistogram, self).closeEvent(event)
@@ -188,26 +215,30 @@ class SerialHistogram(QtWidgets.QWidget):
             self.exponentialPlotWidget.plot(x, y, stepMode=True, fillLevel=0, brush=pg.mkBrush('#374c80'))
 
     def changeXAxisRangeExp(self):
+        """Allow the user to change the maximum range of
+        the X-axis for the exponential histogram."""
         maxXRange, ok = QtWidgets.QInputDialog.getInt(self, "Change X-axis Range", "Enter new max X-axis value (ms):", value=self.maxXRangeExp, min=100)
         if ok:
             self.maxXRangeExp = maxXRange
             self.updateExponential()  # Update histogram to reflect new X-axis range immediately
 
     def changeNumberOfBinsExp(self):
+        """Allow the user to change the number of bins
+        for the exponential histogram."""
         numBins, ok = QtWidgets.QInputDialog.getInt(self, "Change Number of Bins", "Enter new number of bins:", value=self.numBinsExp, min=1)
         if ok:
             self.numBinsExp = numBins
             self.updateExponential()  # Update histogram to reflect new number of bins immediately
 
     def clearPlotExp(self):
-        """Clear the plot and the underlying data."""
+        """Clear the exponential histogram plot and the underlying data."""
         self.exponentialPlotWidget.clear()  # This clears the visual plot
         self.time_differences.clear()
 
 
-    """Poisson funtions"""
+    """Histogram funtions"""
     def updatePoisson(self):
-        """Updates the Poisson plot based on the collected time differences."""
+        """Update the histogram plot with new data."""
         self.getData()
         if len(self.timeStamps) > 0:
             y, x = np.histogram(list(self.timeStamps), bins=self.numBinsPoisson, range=(0, self.maxXRangePoisson))
@@ -215,6 +246,7 @@ class SerialHistogram(QtWidgets.QWidget):
             self.poissonPlotWidget.plot(x, y, stepMode=True, fillLevel=0, brush=pg.mkBrush('#374c80'))
 
     def changeXAxisRangePoisson(self):
+        """Allow the user to change the maximum range of the X-axis for the histogram."""
         maxXRange, ok = QtWidgets.QInputDialog.getInt(self, "Change X-axis Range",
                                                      "Enter new max X-axis value (hours):",
                                                      value=self.maxXRangePoisson, min=1)
@@ -223,6 +255,7 @@ class SerialHistogram(QtWidgets.QWidget):
             self.updatePoisson()  # Update histogram to reflect new X-axis range immediately
 
     def changeNumberOfBinsPoisson(self):
+        """Allow the user to change the number of bins for the histogram."""
         numBins, ok = QtWidgets.QInputDialog.getInt(self, "Change Number of Bins", "Enter new number of bins:", value=self.numBinsPoisson, min=1)
         if ok:
             self.numBinsPoisson = numBins
@@ -234,7 +267,7 @@ class SerialHistogram(QtWidgets.QWidget):
         self.timeStamps.clear()
 
     def savePlot(self, plotWidget, defaultName="plot"):
-        """Generalized save plot method for any plot widget."""
+        """Save the current plot to a file."""
         folder_path = QtWidgets.QFileDialog.getExistingDirectory(self, "Select Folder")
         if not folder_path:
             return
@@ -263,7 +296,7 @@ class SerialHistogram(QtWidgets.QWidget):
         self.savePlot(self.exponentialPlotWidget, "exponential_histogram")
 
     def savePlotPoisson(self):
-        """Save the current Poisson plot to a file."""
+        """Save the current Histogram plot to a file."""
         self.savePlot(self.poissonPlotWidget, "poisson_histogram")
 
 
