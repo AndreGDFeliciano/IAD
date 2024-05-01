@@ -1,23 +1,26 @@
 // Parameters
-const int threshold1 = 21; // bins
-const int threshold2 = 21; // bins
-const int debounceTime = 34; // ms
-const int coincidenceWindow = 500; // μs
+const int threshold1 = 21; // Threshold for detector 1 (bins)
+const int threshold2 = 21; // Threshold for detector 1 (bins)
+const int debounceTime = 34; // Debounce Time (ms)
+const int coincidenceWindow = 500; // Coincidence Window (μs)
 
 // Sets up pins
 int firstAnalogIn  = 15; // A1
 int secondAnalogIn  = 16; // A2
 
-// Declare variables
-int lastPulseTime = 0; // Wrong first detection
-volatile int det1 = 0, det2 = 0;
-volatile int maxPeak1 = 0, maxPeak2 = 0;
-volatile unsigned long long timeDet1 = 0, timeDet2 = 0;
-unsigned long long timeOffset = 0, lastTime = 0;
-unsigned long long currentTime = 0, correctedTime = 0;
+// Variable Declarations
+int lastPulseTime = 0; // Time of last detection
+volatile int det1 = 0, det2 = 0; // Current detection values
+volatile int maxPeak1 = 0, maxPeak2 = 0; // Maximum values observed
+volatile unsigned long long timeDet1 = 0, timeDet2 = 0; // Peak timestamps
+unsigned long long timeOffset = 0; // For handling micros() overflow
+unsigned long long lastTime = 0; // For handling micros() overflow
+unsigned long long currentTime = 0, correctedTime = 0; // Current and adjusted times
 
 void setup() {
 	Serial.begin(9600);
+
+  // Pin setup
 	pinMode(firstAnalogIn, INPUT);
 	pinMode(secondAnalogIn, INPUT);
 
@@ -25,23 +28,23 @@ void setup() {
 }
 
 void loop() {
-  currentTime = micros();
+  currentTime = micros(); // Update the current time
 
   // Handles micros() overflow
   if (currentTime < lastTime) {
-    timeOffset += 4294967294;  // 2^32 - 1
+    timeOffset += 4294967295;  // 2^32 - 1
   }
 
   lastTime = currentTime;
-  correctedTime = currentTime + timeOffset;
+  correctedTime = currentTime + timeOffset; // Adjusted time considering overflow
 
 
   // Read sensor values
   det1 = analogRead(firstAnalogIn);
   det2 = analogRead(secondAnalogIn);
 
-  // Detect and store peaks
-  if (det1 > threshold1 && det1 > maxPeak1) { 
+  // Detect new peaks and record their time
+  if (det1 > threshold1 && det1 > maxPeak1) {
       maxPeak1 = det1;
       timeDet1 = correctedTime;
   }
@@ -50,9 +53,9 @@ void loop() {
       timeDet2 = correctedTime;
   }
 
-  // Check the coincidence window
+  // Check if peaks are inside the coincidence window
   if (abs((int)(timeDet1 - timeDet2)) <= coincidenceWindow && timeDet1 && timeDet2) {
-    // Check debounce time
+    // Check if pulse isn't within the debounce time to avoid double counts
     if (correctedTime - lastPulseTime > debounceTime*1000) {
       // Print output:
       // Peak Value 1 (mV); Peak Value 2 (mV); Time Stamp (μs); Time between Muons (μs)
@@ -64,7 +67,7 @@ void loop() {
       Serial.print(" ");
       Serial.println(correctedTime - lastPulseTime); // μs
 
-      lastPulseTime = correctedTime;
+      lastPulseTime = correctedTime; // Update time of last event
     }
     // Reset peak values
     maxPeak1 = 0;
@@ -72,7 +75,7 @@ void loop() {
     timeDet1 = 0;
     timeDet2 = 0;
   } else {
-    // Check if outside coincidence window
+    // Reset peaks if outside the coincidence window
     if (timeDet1 && (correctedTime - timeDet1 > coincidenceWindow)) {
       timeDet1 = 0;
       maxPeak1 = 0;
@@ -86,5 +89,5 @@ void loop() {
       maxPeak2 = 0;
     }
   }
-  delayMicroseconds(1);
+  delayMicroseconds(1); // Small delay because of CPU
 }
