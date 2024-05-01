@@ -57,7 +57,23 @@ class SerialHistogram(QtWidgets.QWidget):
 
 
     def setupUi(self):
-        """Setup the UI components for the histogram display."""
+        """
+        Sets up the User Interface for the Muon Telescope application.
+        The UI includes:
+        - Histogram controls for both exponential and Poisson data:
+          * Two plot widgets for displaying histograms.
+          * Four buttons for each histogram:
+            1. Change X-axis Range
+            2. Change Number of Bins
+            3. Clear Plot
+            4. Save Plot
+        - Layouts:
+          * Exponential Layout: Controls and plot for the time between detections.
+          * Poisson Layout: Controls and plot for the count of detections per hour.
+        - Styling:
+          * Sets button styles and adds widgets to layouts.
+        """
+        
         self.setWindowTitle('Muon Telescope')
         self.mainLayout = QtWidgets.QHBoxLayout()
         self.setLayout(self.mainLayout)
